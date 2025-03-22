@@ -50,6 +50,6 @@ if __name__ == "__main__":
     model = RainRemovalNet()
     print(model)
     # Example input: batch of 4 RGB images of size 128x128
-    sample_input = torch.randn(4, 3, 128, 128)
+    sample_input = torch.randn(4, 3, 480, 480)
     output = model(sample_input)
     print(f"Output shape: {output.shape}")
