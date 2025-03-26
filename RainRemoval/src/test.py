@@ -1,4 +1,5 @@
 import os
+import argparse
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
@@ -47,29 +48,32 @@ def test_model(model, test_loader, device, output_dir):
 
 # Main Testing Script
 if __name__ == "__main__":
-    # Paths
-    test_dir = "./datasets/test_a"  # Change to test_b for the other test set
-    model_path = "./models/advanced_rain_removal_net.pth"
-    output_dir = "./outputs/test_a"  # Change to test_b for the other test set
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Test the Advanced Rain Removal model.")
+    parser.add_argument("--test_dir", type=str, default="./datasets/test_a", help="Path to the test dataset.")
+    parser.add_argument("--model_path", type=str, default="./models/advanced_rain_removal_net.pth", help="Path to the trained model.")
+    parser.add_argument("--output_dir", type=str, default="./outputs/test_a", help="Path to save the cleaned images.")
+    parser.add_argument("--image_size", type=int, default=256, help="Size of the input images (default: 256).")
+    args = parser.parse_args()
 
     # Device configuration
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Data transformations
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize((args.image_size, args.image_size)),
         transforms.ToTensor()
     ])
 
     # Dataset and DataLoader
-    test_dataset = TestRainDataset(test_dir, transform=transform)
+    test_dataset = TestRainDataset(args.test_dir, transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     # Load the trained model
-    model = AdvancedRainRemovalNet().to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    print(f"Loaded model from {model_path}")
+    model = AdvancedRainRemovalNet(image_size=args.image_size).to(device)  # Pass image_size to the model
+    model.load_state_dict(torch.load(args.model_path, map_location=device))
+    print(f"Loaded model from {args.model_path}")
 
     # Test the model
-    test_model(model, test_loader, device, output_dir)
-    print(f"Cleaned images saved to {output_dir}")
+    test_model(model, test_loader, device, args.output_dir)
+    print(f"Cleaned images saved to {args.output_dir}")

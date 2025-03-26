@@ -21,8 +21,9 @@ class SEBlock(nn.Module):
 
 # Advanced Rain Removal Network
 class AdvancedRainRemovalNet(nn.Module):
-    def __init__(self):
+    def __init__(self, image_size):
         super(AdvancedRainRemovalNet, self).__init__()
+        self.image_size = image_size  # Store the image size for reference
         
         # Encoder
         self.encoder1 = nn.Sequential(
@@ -79,7 +80,7 @@ class AdvancedRainRemovalNet(nn.Module):
 
 # Example usage
 if __name__ == "__main__":
-    model = AdvancedRainRemovalNet()
+    model = AdvancedRainRemovalNet(image_size=(256, 256))
     print(model)
     # Example input: batch of 4 RGB images of size 128x128
     sample_input = torch.randn(4, 3, 256, 256)
