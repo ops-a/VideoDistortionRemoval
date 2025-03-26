@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torchvision import transforms, models
 from PIL import Image
-from models.model import RainRemovalNet
+from models.model import AdvancedRainRemovalNet
 
 # Custom Dataset
 class RainDataset(Dataset):
@@ -33,8 +33,23 @@ class RainDataset(Dataset):
 
         return data_image, gt_image
 
+# Perceptual Loss using VGG
+class PerceptualLoss(nn.Module):
+    def __init__(self):
+        super(PerceptualLoss, self).__init__()
+        vgg = models.vgg16(weights="VGG16_Weights.DEFAULT").features[:16]  # Use first few layers of VGG16
+        self.vgg = vgg.eval()  # Set to evaluation mode
+        for param in self.vgg.parameters():
+            param.requires_grad = False  # Freeze VGG parameters
+        self.criterion = nn.MSELoss()
+
+    def forward(self, output, target):
+        output_features = self.vgg(output)
+        target_features = self.vgg(target)
+        return self.criterion(output_features, target_features)
+
 # Training Function
-def train_model(model, train_loader, criterion, optimizer, device, num_epochs=20):
+def train_model(model, train_loader, criterion, perceptual_loss, optimizer, scheduler, device, num_epochs=20):
     model.train()
     for epoch in range(num_epochs):
         epoch_loss = 0.0
@@ -43,7 +58,7 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=20
 
             # Forward pass
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets) + 0.1 * perceptual_loss(outputs, targets)  # Combine losses
 
             # Backward pass and optimization
             optimizer.zero_grad()
@@ -52,7 +67,10 @@ def train_model(model, train_loader, criterion, optimizer, device, num_epochs=20
 
             epoch_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss/len(train_loader):.4f}")
+        # Step the scheduler
+        scheduler.step()
+
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss/len(train_loader):.4f}, LR: {scheduler.get_last_lr()[0]:.6f}")
 
 # Main Training Script
 if __name__ == "__main__":
@@ -69,7 +87,7 @@ if __name__ == "__main__":
 
     # Data transformations
     transform = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((256, 256)),
         transforms.ToTensor()
     ])
 
@@ -78,14 +96,16 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Model, Loss, and Optimizer
-    model = RainRemovalNet().to(device)
+    model = AdvancedRainRemovalNet().to(device)
     criterion = nn.MSELoss()  # Mean Squared Error Loss
+    perceptual_loss = PerceptualLoss().to(device)  # Perceptual Loss
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)  # Reduce LR every 10 epochs
 
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, device, num_epochs)
+    train_model(model, train_loader, criterion, perceptual_loss, optimizer, scheduler, device, num_epochs)
 
     # Save the trained model
-    model_save_path = "/home/redstar/Workspace/VideoDistortionRemoval/RainRemoval/models/rain_removal_net.pth"
+    model_save_path = "/home/redstar/Workspace/VideoDistortionRemoval/RainRemoval/models/advanced_rain_removal_net.pth"
     torch.save(model.state_dict(), model_save_path)
     print(f"Model saved to {model_save_path}")
